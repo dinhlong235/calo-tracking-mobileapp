@@ -182,10 +182,42 @@ export default function CameraScreen() {
         return;
       }
 
+      let finalPhotoUrl = null;
+
+      if (selectedImage) {
+        try {
+          const response = await fetch(selectedImage);
+          const blob = await response.blob();
+          const arrayBuffer = await new Response(blob).arrayBuffer();
+          const fileExt = selectedImage.split('.').pop() || 'jpg';
+          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('meal-photos')
+            .upload(fileName, arrayBuffer, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              upsert: true,
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          const { data: publicUrlData } = supabase.storage
+            .from('meal-photos')
+            .getPublicUrl(fileName);
+
+          finalPhotoUrl = publicUrlData.publicUrl;
+        } catch (uploadErr: any) {
+          console.warn('Upload error:', uploadErr);
+          Alert.alert('Cảnh báo', 'Không thể tải ảnh lên máy chủ. Bữa ăn sẽ được lưu không có ảnh.');
+        }
+      }
+
       const { error } = await supabase.from('meal_logs').insert([
         {
           user_id: user.id,
-          photo_url: selectedImage || null,
+          photo_url: finalPhotoUrl,
           food_name: foodName,
           estimated_calories: parseInt(calories, 10),
           protein_g: parseFloat(protein) || 0,

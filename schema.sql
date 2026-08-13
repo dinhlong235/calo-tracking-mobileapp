@@ -82,3 +82,25 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Create storage bucket for meal photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('meal-photos', 'meal-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for meal-photos bucket
+CREATE POLICY "Users can upload their own meal photos"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'meal-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "Anyone can view meal photos"
+  ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'meal-photos');
+
+CREATE POLICY "Users can delete their own meal photos"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'meal-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
