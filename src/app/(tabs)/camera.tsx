@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -186,16 +187,22 @@ export default function CameraScreen() {
 
       if (selectedImage) {
         try {
-          const response = await fetch(selectedImage);
+          // Resize chiều rộng tối đa 1024px, nén quality 0.7 để tối ưu dung lượng & token AI
+          const manipulated = await ImageManipulator.manipulateAsync(
+            selectedImage,
+            [{ resize: { width: 1024 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          );
+
+          const response = await fetch(manipulated.uri);
           const blob = await response.blob();
           const arrayBuffer = await new Response(blob).arrayBuffer();
-          const fileExt = selectedImage.split('.').pop() || 'jpg';
-          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+          const fileName = `${user.id}/${Date.now()}.jpg`;
 
           const { error: uploadError } = await supabase.storage
             .from('meal-photos')
             .upload(fileName, arrayBuffer, {
-              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              contentType: 'image/jpeg',
               upsert: true,
             });
 
